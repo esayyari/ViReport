@@ -24,6 +24,7 @@ import multiprocessing
 from copy import deepcopy
 from time import sleep
 
+
 def decompose_phylogeny(phy, max_size, min_size):
     trees_map = []
     tree_list = [phy]
@@ -60,7 +61,7 @@ def run_process(command):
 def run_alignment(process_name, tasks, results):
     command = tasks.get()
     while True:
-        if command == -1:
+        if type(command) != list:
             print('[%s] evaluation routine quits' % process_name)
 
             # Indicate finished
@@ -69,6 +70,7 @@ def run_alignment(process_name, tasks, results):
         else:
             rc, err, output_fp = run_process(command)
             results.put((rc, err, output_fp))
+            break
     return
 
 
@@ -138,28 +140,18 @@ if __name__ == '__main__':
     sleep(5)
     for i in range(num_processes):
         all_tasks.append(-1)
-
     for single_task in all_tasks:
         tasks.put(single_task)
     print("The total number of tasks is:", len(all_tasks))
     print("The number of subprocesses is", num_processes)
+    for job in processes:
+        job.join()
 
-    num_finished_processes = 0
-
-    while True:
-        # Read result
-        new_result = results.get()
-
-        # Have a look at the results
-        if new_result == -1:
-            # Process has finished
-            num_finished_processes += 1
-
-            if num_finished_processes == num_processes:
-                break
-        else:
-            rc, err, output_fp = new_result
-            print("Output file path", output_fp, "generated with the output code", rc)
-            if rc != 0:
-                print("Something went wrong running", output_fp)
-                print(err)
+    # Get process results from the output queue
+    final_results = [results.get() for p in processes]
+    for result in final_results:
+        rc, err, output_fp = result
+        print("Output file path", output_fp, "generated with the output code", rc)
+        if rc != 0:
+            print("Something went wrong running", output_fp)
+            print(err)
